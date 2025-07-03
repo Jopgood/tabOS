@@ -1,0 +1,3 @@
+{
+  "extends": "@tabos/tsconfig/base.json"
+}

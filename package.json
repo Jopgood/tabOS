@@ -1,0 +1,31 @@
+{
+  "name": "tabos",
+  "private": true,
+  "version": "0.0.1",
+  "description": "A tabOS",
+  "main": "index.js",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev --parallel",
+    "dev:api": "turbo dev --filter=@tabos/api",
+    "dev:core": "turbo dev --filter=@tabos/core",
+    "start:api": "turbo start --filter=@tabos/api",
+    "start:core": "turbo start --filter=@tabos/core",
+    "format": "biome format --write .",
+    "lint": "turbo lint && manypkg check",
+    "typecheck": "turbo typecheck"
+  },
+  "author": "James Hopgood",
+  "license": "ISC",
+  "dependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@manypkg/cli": "^0.24.0",
+    "turbo": "2.5.4",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "bun@1.2.16"
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@tabos/api",
+  "scripts": {
+    "dev": "PORT=3003 bun run --hot src/index.ts",
+    "db:pull": "drizzle-kit pull",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
+  },
+  "exports": {
+    "./trpc/routers/_app": "./src/trpc/routers/_app.ts",
+    "./trpc/init": "./src/trpc/init.ts"
+  },
+  "dependencies": {
+    "@clerk/backend": "^2.3.1",
+    "@clerk/clerk-js": "^5.69.3",
+    "@clerk/types": "^4.62.1",
+    "@hono/clerk-auth": "^3.0.1",
+    "@hono/trpc-server": "^0.3.4",
+    "@hono/zod-openapi": "^0.19.8",
+    "@hono/zod-validator": "^0.7.0",
+    "@scalar/hono-api-reference": "^0.9.4",
+    "@tabos/supabase": "workspace:*",
+    "drizzle-orm": "^0.44.2",
+    "hono": "^4.7.11",
+    "jose": "^6.0.11",
+    "pino": "^9.7.0",
+    "postgres": "^3.4.7",
+    "superjson": "^2.2.2"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.1",
+    "@types/bun": "^1.2.16"
+  }
+}
