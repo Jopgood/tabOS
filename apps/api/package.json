@@ -3,6 +3,9 @@
   "scripts": {
     "dev": "PORT=3003 bun run --hot src/index.ts",
     "db:pull": "drizzle-kit pull",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
@@ -11,7 +14,9 @@
   },
   "exports": {
     "./trpc/routers/_app": "./src/trpc/routers/_app.ts",
-    "./trpc/init": "./src/trpc/init.ts"
+    "./trpc/init": "./src/trpc/init.ts",
+    "./db/schema": "./src/db/schema.ts",
+    "./db": "./src/db/index.ts"
   },
   "dependencies": {
     "@clerk/backend": "^2.3.1",
@@ -23,6 +28,7 @@
     "@hono/zod-validator": "^0.7.0",
     "@scalar/hono-api-reference": "^0.9.4",
     "@tabos/supabase": "workspace:*",
+    "dotenv": "^17.2.0",
     "drizzle-orm": "^0.44.2",
     "hono": "^4.7.11",
     "jose": "^6.0.11",

@@ -1,22 +1,13 @@
 // components/main.tsx
 "use client";
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+import { TabBar } from "./tab-bar";
 
 export function Main() {
-  const trpc = useTRPC();
-
-  const { data, isLoading, error } = useQuery({
-    ...trpc.tabs.get.queryOptions(),
-  });
-
-  if (isLoading) {
-    return <div>Loading tabs...</div>;
-  }
-
-  if (error) {
-    return <div>Error loading tabs: {error.message}</div>;
-  }
-
-  return <div>{JSON.stringify(data)}</div>;
+  return (
+    <div className="flex flex-col items-center gap-4 p-4">
+      <div className="flex gap-2">
+        <TabBar />
+      </div>
+    </div>
+  );
 }

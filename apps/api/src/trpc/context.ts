@@ -1,9 +1,9 @@
-import { getAuth } from "@hono/clerk-auth";
-import { createClient } from "@api/services/supabase";
 import { connectDb } from "@api/db";
+import { createClient } from "@api/services/supabase";
+import { getAuth } from "@hono/clerk-auth";
 
-import type { SessionAuthObject } from "@clerk/backend";
 import type { Database } from "@api/db";
+import type { SessionAuthObject } from "@clerk/backend";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Context as HonoContext } from "hono";
 
@@ -15,7 +15,7 @@ type TRPCContext = {
 
 export const createContext = async (
   _: unknown,
-  c: HonoContext
+  c: HonoContext,
 ): Promise<TRPCContext> => {
   const supabase = await createClient();
   const db = await connectDb();

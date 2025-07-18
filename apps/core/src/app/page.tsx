@@ -1,18 +1,16 @@
-import type { Metadata } from "next";
-import { HydrateClient } from "@/trpc/server";
 import { Main } from "@/components/main";
+import { HydrateClient } from "@/trpc/server";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Overview | TabOS",
+  title: "TabOS",
 };
 
-export default async function Overview() {
+export default async function HomePage() {
   return (
     <HydrateClient>
       <div>
-        <div className="h-[530px] mb-4">
-          <div className="mt-8 relative"></div>
-        </div>
+        <Main />
       </div>
     </HydrateClient>
   );

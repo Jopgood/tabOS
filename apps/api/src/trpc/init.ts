@@ -14,7 +14,7 @@ type TRPCContext = {
 
 export const createTRPCContext = async (
   _: unknown,
-  c: Context
+  c: Context,
 ): Promise<TRPCContext> => {
   const supabase = await createClient();
   const db = await connectDb();

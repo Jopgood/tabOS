@@ -12,7 +12,6 @@ import {
 import { cache } from "react";
 import superjson from "superjson";
 import { makeQueryClient } from "./query-client";
-import { auth } from "@clerk/nextjs/server";
 
 // IMPORTANT: Create a stable getter for the query client that
 //            will return the same client during the same request.
@@ -25,22 +24,8 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
       httpBatchLink({
         url: `${process.env.NEXT_PUBLIC_API_URL}/trpc`,
         transformer: superjson,
-        async headers() {
-          try {
-            // Get the auth token from Clerk on the server side
-            const { getToken } = await auth();
-            const token = await getToken();
-
-            return {
-              Authorization: token ? `Bearer ${token}` : "",
-            };
-          } catch (error) {
-            console.warn("Failed to get server auth token:", error);
-            return {
-              Authorization: "",
-            };
-          }
-        },
+        // Remove auth headers from server-side client
+        // Auth will be handled by the frontend client in client.tsx
       }),
       loggerLink({
         enabled: (opts) =>
@@ -62,7 +47,7 @@ export function HydrateClient(props: { children: React.ReactNode }) {
 }
 
 export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
-  queryOptions: T
+  queryOptions: T,
 ) {
   const queryClient = getQueryClient();
 
@@ -74,7 +59,7 @@ export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
 }
 
 export function batchPrefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
-  queryOptionsArray: T[]
+  queryOptionsArray: T[],
 ) {
   const queryClient = getQueryClient();
 

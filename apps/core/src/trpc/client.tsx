@@ -1,17 +1,19 @@
+// trpc/client.ts
 "use client";
 
+import { useAuth } from "@clerk/nextjs";
 import type { AppRouter } from "@tabos/api/trpc/routers/_app";
 import type { QueryClient } from "@tanstack/react-query";
 import { QueryClientProvider, isServer } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { createTRPCClient, httpBatchLink, loggerLink } from "@trpc/client";
-import { createTRPCContext } from "@trpc/tanstack-react-query";
-import { useState, useEffect, useRef } from "react";
+import { httpBatchLink, loggerLink } from "@trpc/client";
+import { createTRPCReact } from "@trpc/react-query";
+import { useEffect, useRef, useState } from "react";
 import superjson from "superjson";
 import { makeQueryClient } from "./query-client";
-import { useAuth } from "@clerk/nextjs";
 
-export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
+// Use standard createTRPCReact instead
+export const api = createTRPCReact<AppRouter>();
 
 let browserQueryClient: QueryClient;
 
@@ -33,14 +35,14 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
   }, [getToken]);
 
   const queryClient = getQueryClient();
+
   const [trpcClient] = useState(() =>
-    createTRPCClient<AppRouter>({
+    api.createClient({
       links: [
         httpBatchLink({
           url: `${process.env.NEXT_PUBLIC_API_URL}/trpc`,
           transformer: superjson,
           async headers() {
-            // Since middleware protects routes, we can be more confident about auth
             try {
               const authToken = await getTokenRef.current();
               return {
@@ -58,15 +60,15 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
             (opts.direction === "down" && opts.result instanceof Error),
         }),
       ],
-    })
+    }),
   );
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+      <api.Provider client={trpcClient} queryClient={queryClient}>
         {children}
-      </TRPCProvider>
-      <ReactQueryDevtools initialIsOpen={false} />
+        <ReactQueryDevtools initialIsOpen={false} />
+      </api.Provider>
     </QueryClientProvider>
   );
 }

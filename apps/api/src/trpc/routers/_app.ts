@@ -1,6 +1,6 @@
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
-import { tabsRouter } from "./tabs";
 import { router } from "../alt";
+import { tabsRouter } from "./tabs";
 
 export const appRouter = router({
   tabs: tabsRouter,

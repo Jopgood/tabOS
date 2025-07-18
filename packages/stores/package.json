@@ -1,0 +1,22 @@
+{
+  "name": "@tabos/stores",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./tab-store": "./src/tab-store.ts",
+    "./hooks/use-tab-ui": "./src/hooks/use-tab-ui.ts",
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "immer": "^10.0.3",
+    "uuid": "^11.1.0",
+    "zustand": "^4.4.7",
+    "@tabos/api": "workspace:*"
+  },
+  "devDependencies": {
+    "@tabos/tsconfig": "workspace:*",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  }
+}
