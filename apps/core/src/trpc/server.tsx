@@ -24,8 +24,6 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
       httpBatchLink({
         url: `${process.env.NEXT_PUBLIC_API_URL}/trpc`,
         transformer: superjson,
-        // Remove auth headers from server-side client
-        // Auth will be handled by the frontend client in client.tsx
       }),
       loggerLink({
         enabled: (opts) =>
@@ -47,7 +45,7 @@ export function HydrateClient(props: { children: React.ReactNode }) {
 }
 
 export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
-  queryOptions: T,
+  queryOptions: T
 ) {
   const queryClient = getQueryClient();
 
@@ -59,7 +57,7 @@ export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
 }
 
 export function batchPrefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
-  queryOptionsArray: T[],
+  queryOptionsArray: T[]
 ) {
   const queryClient = getQueryClient();
 

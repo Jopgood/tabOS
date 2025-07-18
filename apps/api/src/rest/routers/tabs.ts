@@ -56,10 +56,10 @@ app.openapi(
     } catch (error) {
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 // Get a specific tab
@@ -118,10 +118,10 @@ app.openapi(
     } catch (error) {
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 // Create a new tab
@@ -187,10 +187,10 @@ app.openapi(
     } catch (error) {
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 // Update a tab
@@ -259,10 +259,10 @@ app.openapi(
       }
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 // Update tab position
@@ -341,10 +341,10 @@ app.openapi(
       }
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 // Delete a tab
@@ -405,10 +405,10 @@ app.openapi(
       }
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 // Set active tab
@@ -475,10 +475,10 @@ app.openapi(
       }
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 // Get active tab
@@ -533,10 +533,10 @@ app.openapi(
     } catch (error) {
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 // Clear active tab
@@ -579,10 +579,10 @@ app.openapi(
     } catch (error) {
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
-        500,
+        500
       );
     }
-  },
+  }
 );
 
 export const tabsRouter = app;
