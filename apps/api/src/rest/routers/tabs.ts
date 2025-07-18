@@ -179,6 +179,7 @@ app.openapi(
       const result = await tabsApi.create(db, {
         userId,
         title: body.title,
+        type: body.type,
         content: body.content,
         afterId: body.afterId,
       });

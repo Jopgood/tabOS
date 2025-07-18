@@ -15,6 +15,10 @@ export const tabResponseSchema = z
       description: "Title of the tab.",
       example: "My Important Tab",
     }),
+    type: z.string().openapi({
+      description: "Type of the tab.",
+      example: "projects",
+    }),
     content: z
       .any()
       .nullable()
@@ -45,6 +49,7 @@ export const tabResponseSchema = z
       id: "123e4567-e89b-12d3-a456-426614174000",
       userId: "user_123",
       title: "My Important Tab",
+      type: "projects",
       content: { text: "Some content" },
       afterId: null,
       isActive: true,
@@ -67,6 +72,7 @@ export const tabsResponseSchema = z
           id: "123e4567-e89b-12d3-a456-426614174000",
           userId: "user_123",
           title: "My Important Tab",
+          type: "projects",
           content: { text: "Some content" },
           afterId: null,
           isActive: true,
@@ -84,6 +90,10 @@ export const createTabRequestSchema = z
       description: "Title of the new tab.",
       example: "New Tab",
     }),
+    type: z.string().min(1).openapi({
+      description: "Type of the new tab.",
+      example: "projects",
+    }),
     content: z
       .any()
       .optional()
@@ -100,6 +110,7 @@ export const createTabRequestSchema = z
     description: "Request body for creating a new tab.",
     example: {
       title: "New Tab",
+      type: "projects",
       content: { text: "Initial content" },
       afterId: "123e4567-e89b-12d3-a456-426614174001",
     },

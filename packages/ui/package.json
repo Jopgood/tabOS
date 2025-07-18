@@ -58,6 +58,7 @@
     "./separator": "./src/components/separator.tsx",
     "./skeleton": "./src/components/skeleton.tsx",
     "./spinner": "./src/components/spinner.tsx",
+    "./sidebar": "./src/components/sidebar.tsx",
     "./switch": "./src/components/switch.tsx",
     "./multiple-selector": "./src/components/multiple-selector.tsx",
     "./table": "./src/components/table.tsx",

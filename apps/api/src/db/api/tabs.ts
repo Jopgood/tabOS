@@ -6,6 +6,7 @@ import { type NewTab, type Tab, tabs } from "../schema";
 export interface CreateTabInput {
   userId: string;
   title: string;
+  type?: string;
   content?: any;
   afterId?: string;
 }
@@ -22,7 +23,7 @@ async function wouldCreateCycle(
   db: Database,
   movingTabId: string,
   afterTabId: string,
-  userId: string,
+  userId: string
 ): Promise<boolean> {
   // Get all user's tabs to build the chain
   const userTabs = await db
@@ -62,7 +63,7 @@ export const tabsApi = {
   getById: async (
     db: Database,
     id: string,
-    userId: string,
+    userId: string
   ): Promise<Tab | null> => {
     const [tab] = await db
       .select()
@@ -93,6 +94,7 @@ export const tabsApi = {
       .values({
         userId: input.userId,
         title: input.title,
+        type: input.type,
         afterId: input.afterId,
         content: input.content,
         isActive: false, // New tabs are not active by default
@@ -112,7 +114,7 @@ export const tabsApi = {
     db: Database,
     id: string,
     userId: string,
-    input: UpdateTabInput,
+    input: UpdateTabInput
   ): Promise<Tab> => {
     const updateData: Partial<NewTab> = {
       updatedAt: new Date(),
@@ -140,7 +142,7 @@ export const tabsApi = {
     db: Database,
     id: string,
     userId: string,
-    afterId?: string,
+    afterId?: string
   ): Promise<Tab> => {
     // Validate tab belongs to user
     const tabCheck = await db
@@ -191,7 +193,7 @@ export const tabsApi = {
   delete: async (
     db: Database,
     id: string,
-    userId: string,
+    userId: string
   ): Promise<{ success: boolean }> => {
     // First, verify the tab belongs to the user and get its afterId
     const [tabToDelete] = await db

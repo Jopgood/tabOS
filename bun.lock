@@ -22,7 +22,6 @@
         "@hono/zod-validator": "^0.7.0",
         "@scalar/hono-api-reference": "^0.9.4",
         "@tabos/supabase": "workspace:*",
-        "@tabos/tabs": "workspace:*",
         "dotenv": "^17.2.0",
         "drizzle-orm": "^0.44.2",
         "hono": "^4.7.11",

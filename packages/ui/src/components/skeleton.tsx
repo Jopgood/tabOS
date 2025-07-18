@@ -1,4 +1,3 @@
-import type * as React from "react";
 import { cn } from "../utils";
 
 function Skeleton({
@@ -7,13 +6,7 @@ function Skeleton({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn(
-        "relative overflow-hidden",
-        "bg-gradient-to-r from-transparent via-primary/10 to-transparent dark:via-primary/10",
-        "bg-[length:200%_100%]",
-        "animate-shimmer rounded-none",
-        className,
-      )}
+      className={cn("animate-pulse rounded-md bg-primary/10", className)}
       {...props}
     />
   );

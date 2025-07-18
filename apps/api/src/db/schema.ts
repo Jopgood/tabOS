@@ -12,6 +12,7 @@ export const tabs = pgTable("tabs", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull(),
   title: text("title").notNull(),
+  type: text("type").notNull().default("projects"),
   content: jsonb("content"),
   afterId: uuid("after_id"),
   isActive: boolean("is_active").default(false),

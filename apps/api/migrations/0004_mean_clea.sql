@@ -1,0 +1,1 @@
+ALTER TABLE "tabs" ADD COLUMN "type" text DEFAULT 'projects' NOT NULL;

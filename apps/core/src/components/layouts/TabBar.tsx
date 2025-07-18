@@ -47,11 +47,7 @@ export interface TabBarProps {
 }
 
 export function TabBar({
-  className,
   renderIcon = () => null,
-  tabClassName = "",
-  activeTabClassName = "",
-  closeButtonClassName = "",
   scrollButtonClassName = "",
 }: TabBarProps) {
   const { data: orderedTabs } = useOrderedTabs();
@@ -93,7 +89,11 @@ export function TabBar({
   };
 
   return (
-    <div className={cn("flex items-center dark:border-gray-800", className)}>
+    <div
+      className={cn(
+        " sticky top-[var(--header-height)] z-40 flex items-center dark:border-gray-800"
+      )}
+    >
       {/* Left scroll button */}
       {showScrollButtons && (
         <button
@@ -115,9 +115,9 @@ export function TabBar({
             key={tab.id}
             className={cn(
               tab.isActive
-                ? activeTabClassName
+                ? "dark:bg-gray-900 border-b-2 border-b-primary cursor-default"
                 : "cursor-pointer border-b-2 border-b-gray-200 dark:border-gray-800",
-              tabClassName
+              "flex items-center bg-background px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 border-r"
             )}
             onClick={() => setActiveTab.mutate({ id: tab.id })}
           >
@@ -125,6 +125,18 @@ export function TabBar({
               {renderIcon(tab)}
               <span className="ml-2 truncate text-sm">{tab.title}</span>
             </div>
+
+            {/* Only show close button if closable is true and we have more than one tab */}
+            {orderedTabs.length > 1 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`ml-1 h-5 w-5 cursor-pointer rounded-full hover:bg-gray-200 dark:hover:bg-gray-700`}
+                onClick={(e) => handleCloseTab(e, tab.id)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         ))}
       </div>

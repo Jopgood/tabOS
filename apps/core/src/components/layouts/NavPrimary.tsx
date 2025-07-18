@@ -20,19 +20,21 @@ export function NavPrimary({
   items: {
     title: string;
     icon: LucideIcon;
+    type: string;
   }[];
 }) {
-  const { data: orderedTabs, isLoading } = useOrderedTabs();
+  const { data: orderedTabs } = useOrderedTabs();
   const createTab = useCreateTab();
   const setActiveTab = useSetActiveTab();
   const { setActiveTab: storeSetActiveTab } = useTabStore();
 
-  const handleCreateTab = () => {
+  const handleCreateTab = (type: string) => {
     const lastTab = orderedTabs?.[orderedTabs.length - 1];
 
     createTab.mutate(
       {
         title: "New Tab " + (orderedTabs?.length || 0),
+        type: type,
         afterId: lastTab?.id,
       },
       {
@@ -57,7 +59,7 @@ export function NavPrimary({
                   hidden: false,
                 }}
                 className="px-2.5 md:px-2"
-                onClick={handleCreateTab}
+                onClick={() => handleCreateTab(item.type)}
               >
                 <item.icon />
                 <span>{item.title}</span>

@@ -6,6 +6,7 @@ import { z } from "zod";
 // Input validation schemas
 const createTabSchema = z.object({
   title: z.string().min(1),
+  type: z.string().min(1),
   afterId: z.string().uuid().optional(),
   content: z.any().optional(),
 });
@@ -67,7 +68,7 @@ export const tabsRouter = router({
         ctx.db,
         input.id,
         ctx.auth.userId,
-        input.afterId,
+        input.afterId
       );
     }),
 
