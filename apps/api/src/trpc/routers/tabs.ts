@@ -20,7 +20,7 @@ export const tabsRouter = router({
       .select()
       .from(tabsTable)
       .where(eq(tabsTable.userId, ctx.auth.userId))
-      .orderBy(asc(tabsTable.position)); // CHANGED: numeric ordering
+      .orderBy(asc(tabsTable.position));
 
     return userTabs;
   }),
@@ -75,6 +75,35 @@ export const tabsRouter = router({
         .returning();
 
       return updatedTab;
+    }),
+
+  batchUpdateTabPositions: protectedProcedure
+    .input(
+      z.array(
+        z.object({
+          tabId: z.string(),
+          newPosition: z.number(),
+        })
+      )
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Perform batch update - this is much more efficient than individual updates
+      const updatedTabs = await Promise.all(
+        input.map(({ tabId, newPosition }) =>
+          ctx.db
+            .update(tabsTable)
+            .set({ position: newPosition })
+            .where(
+              and(
+                eq(tabsTable.id, tabId),
+                eq(tabsTable.userId, ctx.auth.userId)
+              )
+            )
+            .returning()
+        )
+      );
+
+      return updatedTabs.flat();
     }),
 
   deleteTab: protectedProcedure

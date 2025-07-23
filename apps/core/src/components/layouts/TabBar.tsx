@@ -2,7 +2,7 @@
 "use client";
 import { useTRPC } from "@/trpc/client";
 import { cn } from "@tabos/ui/cn";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTabMutations } from "@/hooks/useTabMutations";
 import {
   DndContext,
@@ -13,14 +13,14 @@ import {
   useSensors,
   DragEndEvent,
 } from "@dnd-kit/core";
+import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import {
+  useSortable,
   SortableContext,
   sortableKeyboardCoordinates,
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect } from "react";
 
 // Sortable Tab Component
 function SortableTab({
@@ -52,7 +52,7 @@ function SortableTab({
       {...attributes}
       {...listeners}
       className={cn(
-        "flex items-center px-4 py-2 bg-white border rounded cursor-move",
+        "flex items-center px-4 py-2 bg-white border cursor-move",
         isDragging && "shadow-lg"
       )}
     >
@@ -72,24 +72,18 @@ function SortableTab({
 }
 
 export function TabBar() {
+  const queryClient = useQueryClient();
   const trpc = useTRPC();
   const tabsQuery = useQuery(trpc.tabs.getTabs.queryOptions());
-  const { createTab, removeTab, reorderTab, generatePositionBetween } =
-    useTabMutations();
-
-  // Add effect to log every render and data change
-  useEffect(() => {
-    console.log("🔄 TabBar render:", {
-      timestamp: Date.now(),
-      tabsData: tabsQuery.data?.map((t) => ({
-        id: t.id,
-        position: t.position,
-      })),
-      isLoading: tabsQuery.isLoading,
-      isFetching: tabsQuery.isFetching,
-      isPending: tabsQuery.isPending,
-    });
-  });
+  const {
+    createTab,
+    removeTab,
+    reorderTab,
+    generatePositionBetween,
+    shouldTriggerGlobalRebalance,
+    rebalanceAllTabs,
+    batchUpdateTabs,
+  } = useTabMutations();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -104,31 +98,102 @@ export function TabBar() {
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
-    console.log("🎯 Drag started");
+    const { active, over } = event;
+    if (!over) return;
 
+    const oldIndex = sortedTabs.findIndex((tab) => tab.id === active.id);
+    const newIndex = sortedTabs.findIndex((tab) => tab.id === over.id);
+
+    // Create a new array with the item moved to simulate the final order
+    const reorderedTabs = [...sortedTabs];
+    const [movedTab] = reorderedTabs.splice(oldIndex, 1);
+    if (!movedTab) return;
+    reorderedTabs.splice(newIndex, 0, movedTab);
+
+    // Calculate new position for the moved tab
+    let newPosition: number;
+    if (newIndex === 0) {
+      newPosition = generatePositionBetween(
+        null,
+        reorderedTabs[1]?.position || null
+      );
+    } else if (newIndex === reorderedTabs.length - 1) {
+      newPosition = generatePositionBetween(
+        reorderedTabs[newIndex - 1]?.position || null,
+        null
+      );
+    } else {
+      const beforePos = reorderedTabs[newIndex - 1]?.position || null;
+      const afterPos = reorderedTabs[newIndex + 1]?.position || null;
+      newPosition = generatePositionBetween(beforePos, afterPos);
+    }
+
+    // Update the moved tab's position in our simulation
+    const finalTabs = reorderedTabs.map((tab) =>
+      tab.id === active.id ? { ...tab, position: newPosition } : tab
+    );
+
+    // Check if we need to rebalance
+    const needsRebalance = shouldTriggerGlobalRebalance(finalTabs);
+
+    if (needsRebalance) {
+      // Rebalance all tabs to clean positions
+      const rebalancedTabs = rebalanceAllTabs(finalTabs);
+
+      // Optimistically update the cache immediately
+      queryClient.setQueryData(trpc.tabs.getTabs.queryKey(), (oldData) => {
+        if (!oldData) return oldData;
+
+        // Create a map of new positions for quick lookup
+        const positionMap = new Map(
+          rebalancedTabs.map((tab) => [tab.id, tab.position])
+        );
+
+        // Update only the positions, preserve all other properties
+        return oldData.map((tab) => ({
+          ...tab,
+          position: positionMap.get(tab.id) ?? tab.position,
+        }));
+      });
+
+      // Prepare batch update data
+      const batchUpdates = rebalancedTabs.map((tab) => ({
+        tabId: tab.id,
+        newPosition: tab.position,
+      }));
+
+      // Perform batch update in background
+      batchUpdateTabs.mutate(batchUpdates, {
+        onError: () => {
+          // If batch update fails, revert the optimistic update
+          queryClient.invalidateQueries({
+            queryKey: trpc.tabs.getTabs.queryKey(),
+          });
+        },
+      });
+    } else {
+      // Standard single tab update
+      reorderTab.mutate({
+        tabId: active.id as string,
+        newPosition,
+      });
+    }
+  };
+
+  const handleDragOver = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
       const oldIndex = sortedTabs.findIndex((tab) => tab.id === active.id);
       const newIndex = sortedTabs.findIndex((tab) => tab.id === over.id);
 
-      console.log("📊 Drag details:", {
-        activeId: active.id,
-        overId: over.id,
-        oldIndex,
-        newIndex,
-        currentOrder: sortedTabs.map((t) => ({
-          id: t.id,
-          position: t.position,
-        })),
-      });
-
       // Calculate new position based on where the tab was dropped
-      let newPosition: number; // CHANGED: number instead of string
+      let newPosition: number;
 
       // Create a new array with the item moved to simulate the final order
       const reorderedTabs = [...sortedTabs];
       const [movedTab] = reorderedTabs.splice(oldIndex, 1);
+      if (!movedTab) return;
       reorderedTabs.splice(newIndex, 0, movedTab);
 
       // Now calculate position based on the new neighbors
@@ -151,16 +216,10 @@ export function TabBar() {
         newPosition = generatePositionBetween(beforePos, afterPos);
       }
 
-      // Trigger the mutation
-      console.log("🚀 Calling reorderTab.mutate with:", {
-        tabId: active.id,
-        newPosition,
-        timestamp: Date.now(),
-      });
-
-      reorderTab.mutate({
-        tabId: active.id as string,
-        newPosition,
+      queryClient.setQueryData(trpc.tabs.getTabs.queryKey(), (old) => {
+        return (old || []).map((tab) =>
+          tab.id === active.id ? { ...tab, position: newPosition } : tab
+        );
       });
     }
   };
@@ -174,9 +233,11 @@ export function TabBar() {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        modifiers={[restrictToHorizontalAxis]}
       >
-        <div className="scrollbar-hide flex flex-grow overflow-x-auto gap-2">
+        <div className="scrollbar-hide flex flex-grow overflow-x-auto  p-4">
           <SortableContext
             items={sortedTabs.map((tab) => tab.id)}
             strategy={horizontalListSortingStrategy}
@@ -198,7 +259,7 @@ export function TabBar() {
               })
             }
             disabled={createTab.isPending}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600"
           >
             +
           </button>
