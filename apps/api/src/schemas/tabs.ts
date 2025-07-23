@@ -30,10 +30,6 @@ export const tabResponseSchema = z
       description: "ID of the tab this tab comes after (for ordering).",
       example: "123e4567-e89b-12d3-a456-426614174001",
     }),
-    isActive: z.boolean().nullable().openapi({
-      description: "Whether this tab is currently active.",
-      example: true,
-    }),
     createdAt: z.string().datetime().nullable().openapi({
       description: "Timestamp when the tab was created.",
       example: "2024-04-30T12:00:00Z",
@@ -52,7 +48,6 @@ export const tabResponseSchema = z
       type: "projects",
       content: { text: "Some content" },
       afterId: null,
-      isActive: true,
       createdAt: "2024-04-30T12:00:00Z",
       updatedAt: "2024-04-30T12:00:00Z",
     },
@@ -75,7 +70,6 @@ export const tabsResponseSchema = z
           type: "projects",
           content: { text: "Some content" },
           afterId: null,
-          isActive: true,
           createdAt: "2024-04-30T12:00:00Z",
           updatedAt: "2024-04-30T12:00:00Z",
         },
@@ -150,20 +144,6 @@ export const updatePositionRequestSchema = z
     description: "Request body for updating tab position.",
     example: {
       afterId: "123e4567-e89b-12d3-a456-426614174001",
-    },
-  });
-
-export const setActiveTabRequestSchema = z
-  .object({
-    id: z.string().uuid().openapi({
-      description: "ID of the tab to set as active.",
-      example: "123e4567-e89b-12d3-a456-426614174000",
-    }),
-  })
-  .openapi({
-    description: "Request body for setting active tab.",
-    example: {
-      id: "123e4567-e89b-12d3-a456-426614174000",
     },
   });
 

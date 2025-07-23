@@ -7,45 +7,27 @@ export interface CreateTabInput {
   userId: string;
   title: string;
   type?: string;
-  content?: any;
-  afterId?: string;
+  position?: number;
 }
 
 export interface UpdateTabInput {
   title?: string;
-  content?: any;
-  afterId?: string;
-  isActive?: boolean;
+  position?: number;
 }
 
-// Helper function to detect cycles in tab positioning
-async function wouldCreateCycle(
+// Helper function to get next available position
+async function getNextPosition(
   db: Database,
-  movingTabId: string,
-  afterTabId: string,
   userId: string
-): Promise<boolean> {
-  // Get all user's tabs to build the chain
-  const userTabs = await db
-    .select({ id: tabs.id, afterId: tabs.afterId })
+): Promise<number> {
+  const result = await db
+    .select({ maxPosition: tabs.position })
     .from(tabs)
-    .where(eq(tabs.userId, userId));
-
-  const tabMap = new Map(userTabs.map((t) => [t.id, t.afterId]));
-
-  // Walk the chain from afterTabId to see if we reach movingTabId
-  let current: string | null | undefined = afterTabId;
-  const visited = new Set();
-
-  while (current && !visited.has(current)) {
-    if (current === movingTabId) {
-      return true; // Cycle detected
-    }
-    visited.add(current);
-    current = tabMap.get(current);
-  }
-
-  return false;
+    .where(eq(tabs.userId, userId))
+    .orderBy(tabs.position);
+  
+  const maxPos = result.reduce((max, tab) => Math.max(max, tab.maxPosition || 0), -1);
+  return maxPos + 1;
 }
 
 // Core API functions - transport agnostic
@@ -74,31 +56,38 @@ export const tabsApi = {
     return tab || null;
   },
 
-  // Create a new tab
-  create: async (db: Database, input: CreateTabInput): Promise<Tab> => {
-    // Validate afterId belongs to user if provided
-    if (input.afterId) {
-      const afterTab = await db
-        .select({ id: tabs.id })
-        .from(tabs)
-        .where(and(eq(tabs.id, input.afterId), eq(tabs.userId, input.userId)))
-        .limit(1);
-
-      if (afterTab.length === 0) {
-        throw new Error("Invalid afterId - tab not found or not owned by user");
-      }
+  // Add create method for sync
+  create: async (
+    db: Database,
+    userId: string,
+    tabData: {
+      id: string;
+      type: string;
+      title: string;
+      position: number;
     }
+  ): Promise<void> => {
+    await db.insert(tabs).values({
+      id: tabData.id,
+      userId,
+      type: tabData.type,
+      title: tabData.title,
+      position: tabData.position,
+      createdAt: new Date(),
+    });
+  },
+
+  // Create a new tab
+  createNew: async (db: Database, input: CreateTabInput): Promise<Tab> => {
+    const position = input.position ?? (await getNextPosition(db, input.userId));
 
     const [newTab] = await db
       .insert(tabs)
       .values({
         userId: input.userId,
         title: input.title,
-        type: input.type,
-        afterId: input.afterId,
-        content: input.content,
-        isActive: false, // New tabs are not active by default
-        updatedAt: new Date(),
+        type: input.type || 'default',
+        position,
       })
       .returning();
 
@@ -116,13 +105,12 @@ export const tabsApi = {
     userId: string,
     input: UpdateTabInput
   ): Promise<Tab> => {
-    const updateData: Partial<NewTab> = {
+    const updateData: any = {
       updatedAt: new Date(),
     };
 
     if (input.title !== undefined) updateData.title = input.title;
-    if (input.content !== undefined) updateData.content = input.content;
-    if (input.isActive !== undefined) updateData.isActive = input.isActive;
+    if (input.position !== undefined) updateData.position = input.position;
 
     const [updatedTab] = await db
       .update(tabs)
@@ -137,12 +125,12 @@ export const tabsApi = {
     return updatedTab;
   },
 
-  // Update tab position in the linked list
+  // Update tab position
   updatePosition: async (
     db: Database,
     id: string,
     userId: string,
-    afterId?: string
+    newPosition: number
   ): Promise<Tab> => {
     // Validate tab belongs to user
     const tabCheck = await db
@@ -155,28 +143,10 @@ export const tabsApi = {
       throw new Error("Tab not found or not owned by user");
     }
 
-    // Validate afterId if provided
-    if (afterId) {
-      const afterTabCheck = await db
-        .select({ id: tabs.id })
-        .from(tabs)
-        .where(and(eq(tabs.id, afterId), eq(tabs.userId, userId)))
-        .limit(1);
-
-      if (afterTabCheck.length === 0) {
-        throw new Error("Invalid afterId - tab not found or not owned by user");
-      }
-
-      // Prevent cycles
-      if (await wouldCreateCycle(db, id, afterId, userId)) {
-        throw new Error("Invalid move - would create cycle");
-      }
-    }
-
     const [updatedTab] = await db
       .update(tabs)
       .set({
-        afterId: afterId,
+        position: newPosition,
         updatedAt: new Date(),
       })
       .where(and(eq(tabs.id, id), eq(tabs.userId, userId)))
@@ -189,15 +159,15 @@ export const tabsApi = {
     return updatedTab;
   },
 
-  // Delete a tab and handle chain relinking
+  // Delete a tab
   delete: async (
     db: Database,
     id: string,
     userId: string
   ): Promise<{ success: boolean }> => {
-    // First, verify the tab belongs to the user and get its afterId
+    // Verify the tab belongs to the user
     const [tabToDelete] = await db
-      .select({ afterId: tabs.afterId })
+      .select({ id: tabs.id })
       .from(tabs)
       .where(and(eq(tabs.id, id), eq(tabs.userId, userId)))
       .limit(1);
@@ -206,79 +176,12 @@ export const tabsApi = {
       throw new Error("Tab not found or not owned by user");
     }
 
-    // Handle cascade positioning in single transaction
-    await db.transaction(async (tx) => {
-      // Update any tabs that were after the deleted one
-      await tx
-        .update(tabs)
-        .set({
-          afterId: tabToDelete.afterId,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(tabs.afterId, id), eq(tabs.userId, userId)));
-
-      // Delete the tab
-      await tx
-        .delete(tabs)
-        .where(and(eq(tabs.id, id), eq(tabs.userId, userId)));
-    });
+    // Delete the tab
+    await db
+      .delete(tabs)
+      .where(and(eq(tabs.id, id), eq(tabs.userId, userId)));
 
     return { success: true };
-  },
-
-  // Set a tab as active (and clear others)
-  setActive: async (db: Database, id: string, userId: string): Promise<Tab> => {
-    // Verify the tab exists and belongs to user
-    const tabExists = await db
-      .select({ id: tabs.id })
-      .from(tabs)
-      .where(and(eq(tabs.id, id), eq(tabs.userId, userId)))
-      .limit(1);
-
-    if (tabExists.length === 0) {
-      throw new Error("Tab not found or not owned by user");
-    }
-
-    // Use transaction to ensure atomicity
-    return await db.transaction(async (tx) => {
-      // Clear all active tabs for this user
-      await tx
-        .update(tabs)
-        .set({ isActive: false, updatedAt: new Date() })
-        .where(eq(tabs.userId, userId));
-
-      // Set the specified tab as active
-      const [activeTab] = await tx
-        .update(tabs)
-        .set({ isActive: true, updatedAt: new Date() })
-        .where(and(eq(tabs.id, id), eq(tabs.userId, userId)))
-        .returning();
-
-      if (!activeTab) {
-        throw new Error("Failed to set tab as active");
-      }
-
-      return activeTab;
-    });
-  },
-
-  // Get the currently active tab for a user
-  getActive: async (db: Database, userId: string): Promise<Tab | null> => {
-    const [activeTab] = await db
-      .select()
-      .from(tabs)
-      .where(and(eq(tabs.userId, userId), eq(tabs.isActive, true)))
-      .limit(1);
-
-    return activeTab || null;
-  },
-
-  // Clear active tab (set none as active)
-  clearActive: async (db: Database, userId: string): Promise<void> => {
-    await db
-      .update(tabs)
-      .set({ isActive: false, updatedAt: new Date() })
-      .where(eq(tabs.userId, userId));
   },
 };
 

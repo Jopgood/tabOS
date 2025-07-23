@@ -1,99 +1,91 @@
-import { tabsApi } from "@api/db/api/tabs";
-// apps/api/src/trpc/routers/tabs.ts
-import { protectedProcedure, router } from "@api/trpc/alt";
+// apps/backend/routers/tabs.ts
 import { z } from "zod";
+import { router, protectedProcedure } from "../alt";
+import { tabsTable } from "@api/db/schema";
+import { eq, and, asc } from "drizzle-orm";
 
-// Input validation schemas
-const createTabSchema = z.object({
-  title: z.string().min(1),
-  type: z.string().min(1),
-  afterId: z.string().uuid().optional(),
-  content: z.any().optional(),
-});
+// Helper function for backend position generation
+function generateEndPosition(tabs: any[]) {
+  if (tabs.length === 0) return 1000;
 
-const updateTabSchema = z.object({
-  id: z.string().uuid(),
-  title: z.string().min(1).optional(),
-  content: z.any().optional(),
-});
+  const sortedTabs = tabs.sort((a, b) => a.position - b.position);
+  const lastPosition = sortedTabs[sortedTabs.length - 1].position;
 
-const updatePositionSchema = z.object({
-  id: z.string().uuid(),
-  afterId: z.string().uuid().optional(),
-});
+  return lastPosition + 1000;
+}
 
-const idSchema = z.object({
-  id: z.string().uuid(),
-});
-
-// tRPC router - thin wrapper around API functions
 export const tabsRouter = router({
-  // List all tabs for the authenticated user
-  list: protectedProcedure.query(async ({ ctx }) => {
-    return tabsApi.list(ctx.db, ctx.auth.userId);
+  getTabs: protectedProcedure.query(async ({ ctx }) => {
+    const userTabs = await ctx.db
+      .select()
+      .from(tabsTable)
+      .where(eq(tabsTable.userId, ctx.auth.userId))
+      .orderBy(asc(tabsTable.position)); // CHANGED: numeric ordering
+
+    return userTabs;
   }),
 
-  // Get a single tab by ID
-  getById: protectedProcedure.input(idSchema).query(async ({ ctx, input }) => {
-    const tab = await tabsApi.getById(ctx.db, input.id, ctx.auth.userId);
-    if (!tab) {
-      throw new Error("Tab not found or not owned by user");
-    }
-    return tab;
-  }),
-
-  // Create a new tab
-  create: protectedProcedure
-    .input(createTabSchema)
+  addTab: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1),
+        type: z.string().min(1),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
-      return tabsApi.create(ctx.db, {
-        ...input,
-        userId: ctx.auth.userId,
-      });
+      // Get current user tabs to calculate position
+      const userTabs = await ctx.db
+        .select()
+        .from(tabsTable)
+        .where(eq(tabsTable.userId, ctx.auth.userId));
+
+      // Generate position for new tab (always at the end)
+      const newPosition = generateEndPosition(userTabs);
+
+      const newTab = await ctx.db
+        .insert(tabsTable)
+        .values({
+          userId: ctx.auth.userId,
+          title: input.title,
+          type: input.type,
+          position: newPosition,
+        })
+        .returning();
+
+      return newTab;
     }),
 
-  // Update an existing tab
-  update: protectedProcedure
-    .input(updateTabSchema)
+  updateTabPosition: protectedProcedure
+    .input(
+      z.object({
+        tabId: z.string(),
+        newPosition: z.number(),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
-      const { id, ...updateData } = input;
-      return tabsApi.update(ctx.db, id, ctx.auth.userId, updateData);
+      const updatedTab = await ctx.db
+        .update(tabsTable)
+        .set({ position: input.newPosition })
+        .where(
+          and(
+            eq(tabsTable.id, input.tabId),
+            eq(tabsTable.userId, ctx.auth.userId)
+          )
+        )
+        .returning();
+
+      return updatedTab;
     }),
 
-  // Update tab position in the linked list
-  updatePosition: protectedProcedure
-    .input(updatePositionSchema)
+  deleteTab: protectedProcedure
+    .input(z.string())
     .mutation(async ({ ctx, input }) => {
-      return tabsApi.updatePosition(
-        ctx.db,
-        input.id,
-        ctx.auth.userId,
-        input.afterId
-      );
+      await ctx.db
+        .delete(tabsTable)
+        .where(
+          and(eq(tabsTable.id, input), eq(tabsTable.userId, ctx.auth.userId))
+        );
+
+      return { success: true };
     }),
-
-  // Delete a tab
-  delete: protectedProcedure
-    .input(idSchema)
-    .mutation(async ({ ctx, input }) => {
-      return tabsApi.delete(ctx.db, input.id, ctx.auth.userId);
-    }),
-
-  // Set a tab as active (clears other active tabs)
-  setActive: protectedProcedure
-    .input(idSchema)
-    .mutation(async ({ ctx, input }) => {
-      return tabsApi.setActive(ctx.db, input.id, ctx.auth.userId);
-    }),
-
-  // Get the currently active tab
-  getActive: protectedProcedure.query(async ({ ctx }) => {
-    return tabsApi.getActive(ctx.db, ctx.auth.userId);
-  }),
-
-  // Clear active tab (set none as active)
-  clearActive: protectedProcedure.mutation(async ({ ctx }) => {
-    await tabsApi.clearActive(ctx.db, ctx.auth.userId);
-    return { success: true };
-  }),
 });

@@ -4,7 +4,6 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { Scalar } from "@scalar/hono-api-reference";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
-import { routers } from "./rest/routers";
 import type { Context } from "./rest/types";
 import { createContext } from "./trpc/context";
 import { appRouter } from "./trpc/routers/_app";
@@ -32,7 +31,7 @@ app.use(
     ],
     exposeHeaders: ["Content-Length"],
     maxAge: 86400,
-  }),
+  })
 );
 
 app.use(
@@ -40,7 +39,7 @@ app.use(
   trpcServer({
     router: appRouter,
     createContext: createContext,
-  }),
+  })
 );
 
 app.get("/health", async (c) => {
@@ -76,10 +75,8 @@ app.openAPIRegistry.registerComponent("securitySchemes", "token", {
 
 app.get(
   "/",
-  Scalar({ url: "/openapi", pageTitle: "TabOS API", theme: "saturn" }),
+  Scalar({ url: "/openapi", pageTitle: "TabOS API", theme: "saturn" })
 );
-
-app.route("/", routers);
 
 export default {
   port: process.env.PORT ? Number.parseInt(process.env.PORT) : 3000,

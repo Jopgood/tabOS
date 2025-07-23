@@ -45,7 +45,7 @@ export default async function Layout({
           "whitespace-pre-line overscroll-none antialiased"
         )}
       >
-        <ClientProvider>{children}</ClientProvider>
+        {children}
       </body>
     </html>
   );

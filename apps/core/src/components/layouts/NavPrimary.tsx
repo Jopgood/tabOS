@@ -1,8 +1,4 @@
-import {
-  useCreateTab,
-  useOrderedTabs,
-  useSetActiveTab,
-} from "@/hooks/use-tabs";
+import { useCreateTab, useOrderedTabs } from "@/hooks/use-tabs";
 import { useTabStore } from "@tabos/stores";
 import {
   SidebarGroup,
@@ -25,7 +21,6 @@ export function NavPrimary({
 }) {
   const { data: orderedTabs } = useOrderedTabs();
   const createTab = useCreateTab();
-  const setActiveTab = useSetActiveTab();
   const { setActiveTab: storeSetActiveTab } = useTabStore();
 
   const handleCreateTab = (type: string) => {
@@ -40,7 +35,6 @@ export function NavPrimary({
       {
         onSuccess: (newTab) => {
           // Set the new tab as active
-          setActiveTab.mutate({ id: newTab.id });
           storeSetActiveTab(newTab.id);
         },
       }

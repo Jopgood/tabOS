@@ -13,7 +13,17 @@
         "NEXT_PUBLIC_URL",
         "NEXT_PUBLIC_CLERK_FRONTEND_API",
         "CLERK_API_KEY",
-        "CLERK_JWT_KEY"
+        "CLERK_JWT_KEY",
+        "DATABASE_URL",
+        "POSTGRES_PASSWORD",
+        "JWT_SECRET",
+        "ANON_KEY",
+        "SERVICE_KEY",
+        "STORAGE_BACKEND",
+        "GLOBAL_S3_BUCKET",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION"
       ],
       "inputs": ["$TURBO_DEFAULT$", ".env"],
       "dependsOn": ["^build"],
@@ -34,6 +44,11 @@
       "cache": false
     },
     "dev": {
+      "inputs": ["$TURBO_DEFAULT$", ".env"],
+      "persistent": true,
+      "cache": false
+    },
+    "storage": {
       "inputs": ["$TURBO_DEFAULT$", ".env"],
       "persistent": true,
       "cache": false

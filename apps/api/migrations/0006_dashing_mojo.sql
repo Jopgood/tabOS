@@ -1,0 +1,1 @@
+ALTER TABLE "tabs" ALTER COLUMN "position" SET DATA TYPE numeric;

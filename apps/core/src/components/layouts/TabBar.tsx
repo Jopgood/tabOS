@@ -1,155 +1,209 @@
+// Updated component with DnD
 "use client";
-
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
-
-import { Button } from "@tabos/ui/button";
-
+import { useTRPC } from "@/trpc/client";
 import { cn } from "@tabos/ui/cn";
+import { useQuery } from "@tanstack/react-query";
+import { useTabMutations } from "@/hooks/useTabMutations";
 import {
-  useActiveTab,
-  useCreateTab,
-  useDeleteTab,
-  useOrderedTabs,
-  useSetActiveTab,
-} from "@/hooks/use-tabs";
-import { useTabStore } from "@tabos/stores";
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useEffect } from "react";
 
-export interface TabBarProps {
-  /**
-   * Class name for the tab bar container
-   */
-  className?: string;
-  /**
-   * Function to render an icon for each tab
-   */
-  renderIcon?: (tab: any) => React.ReactNode;
+// Sortable Tab Component
+function SortableTab({
+  tab,
+  onRemove,
+}: {
+  tab: any;
+  onRemove: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: tab.id });
 
-  /**
-   * Class name for tab elements
-   */
-  tabClassName?: string;
-
-  /**
-   * Class name for the active tab
-   */
-  activeTabClassName?: string;
-
-  /**
-   * Class name for close buttons
-   */
-  closeButtonClassName?: string;
-
-  /**
-   * Class name for scroll buttons
-   */
-  scrollButtonClassName?: string;
-}
-
-export function TabBar({
-  renderIcon = () => null,
-  scrollButtonClassName = "",
-}: TabBarProps) {
-  const { data: orderedTabs } = useOrderedTabs();
-  const deleteTab = useDeleteTab();
-  const setActiveTab = useSetActiveTab();
-
-  const [showScrollButtons, setShowScrollButtons] = useState<boolean>(false);
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
-
-  // Check if tabs container needs scroll buttons
-  useEffect(() => {
-    const checkScrollable = () => {
-      if (tabsContainerRef.current) {
-        const { scrollWidth, clientWidth } = tabsContainerRef.current;
-        setShowScrollButtons(scrollWidth > clientWidth);
-      }
-    };
-
-    checkScrollable();
-    window.addEventListener("resize", checkScrollable);
-    return () => window.removeEventListener("resize", checkScrollable);
-  }, [orderedTabs]);
-
-  // Scroll tabs container
-  const scrollTabs = (direction: "left" | "right") => {
-    if (tabsContainerRef.current) {
-      const scrollAmount = direction === "left" ? -200 : 200;
-      tabsContainerRef.current.scrollBy({
-        left: scrollAmount,
-        behavior: "smooth",
-      });
-    }
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
   };
 
-  // Handle tab close
-  const handleCloseTab = (event: React.MouseEvent, tabId: string) => {
-    event.stopPropagation();
-    deleteTab.mutate({ id: tabId });
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        "flex items-center px-4 py-2 bg-white border rounded cursor-move",
+        isDragging && "shadow-lg"
+      )}
+    >
+      <span>{tab.title}</span>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove(tab.id);
+        }}
+        className="ml-2 text-red-500 hover:text-red-700"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+export function TabBar() {
+  const trpc = useTRPC();
+  const tabsQuery = useQuery(trpc.tabs.getTabs.queryOptions());
+  const { createTab, removeTab, reorderTab, generatePositionBetween } =
+    useTabMutations();
+
+  // Add effect to log every render and data change
+  useEffect(() => {
+    console.log("🔄 TabBar render:", {
+      timestamp: Date.now(),
+      tabsData: tabsQuery.data?.map((t) => ({
+        id: t.id,
+        position: t.position,
+      })),
+      isLoading: tabsQuery.isLoading,
+      isFetching: tabsQuery.isFetching,
+      isPending: tabsQuery.isPending,
+    });
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Sort tabs by position for display (CHANGED: numeric sort instead of string)
+  const sortedTabs = (tabsQuery.data || []).sort(
+    (a, b) => a.position - b.position
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    console.log("🎯 Drag started");
+
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = sortedTabs.findIndex((tab) => tab.id === active.id);
+      const newIndex = sortedTabs.findIndex((tab) => tab.id === over.id);
+
+      console.log("📊 Drag details:", {
+        activeId: active.id,
+        overId: over.id,
+        oldIndex,
+        newIndex,
+        currentOrder: sortedTabs.map((t) => ({
+          id: t.id,
+          position: t.position,
+        })),
+      });
+
+      // Calculate new position based on where the tab was dropped
+      let newPosition: number; // CHANGED: number instead of string
+
+      // Create a new array with the item moved to simulate the final order
+      const reorderedTabs = [...sortedTabs];
+      const [movedTab] = reorderedTabs.splice(oldIndex, 1);
+      reorderedTabs.splice(newIndex, 0, movedTab);
+
+      // Now calculate position based on the new neighbors
+      if (newIndex === 0) {
+        // Moved to beginning
+        newPosition = generatePositionBetween(
+          null,
+          reorderedTabs[1]?.position || null
+        );
+      } else if (newIndex === reorderedTabs.length - 1) {
+        // Moved to end
+        newPosition = generatePositionBetween(
+          reorderedTabs[newIndex - 1]?.position || null,
+          null
+        );
+      } else {
+        // Moved between two tabs
+        const beforePos = reorderedTabs[newIndex - 1]?.position || null;
+        const afterPos = reorderedTabs[newIndex + 1]?.position || null;
+        newPosition = generatePositionBetween(beforePos, afterPos);
+      }
+
+      // Trigger the mutation
+      console.log("🚀 Calling reorderTab.mutate with:", {
+        tabId: active.id,
+        newPosition,
+        timestamp: Date.now(),
+      });
+
+      reorderTab.mutate({
+        tabId: active.id as string,
+        newPosition,
+      });
+    }
   };
 
   return (
     <div
       className={cn(
-        " sticky top-[var(--header-height)] z-40 flex items-center dark:border-gray-800"
+        "sticky top-[var(--header-height)] z-40 flex items-center dark:border-gray-800"
       )}
     >
-      {/* Left scroll button */}
-      {showScrollButtons && (
-        <button
-          className={`flex-shrink-0 p-2 ${scrollButtonClassName}`}
-          onClick={() => scrollTabs("left")}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-      )}
-
-      {/* Tabs container */}
-      <div
-        ref={tabsContainerRef}
-        className="scrollbar-hide flex flex-grow overflow-x-auto"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
       >
-        {orderedTabs?.map((tab) => (
-          <div
-            key={tab.id}
-            className={cn(
-              tab.isActive
-                ? "dark:bg-gray-900 border-b-2 border-b-primary cursor-default"
-                : "cursor-pointer border-b-2 border-b-gray-200 dark:border-gray-800",
-              "flex items-center bg-background px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 border-r"
-            )}
-            onClick={() => setActiveTab.mutate({ id: tab.id })}
+        <div className="scrollbar-hide flex flex-grow overflow-x-auto gap-2">
+          <SortableContext
+            items={sortedTabs.map((tab) => tab.id)}
+            strategy={horizontalListSortingStrategy}
           >
-            <div className="flex min-w-0 flex-grow items-center">
-              {renderIcon(tab)}
-              <span className="ml-2 truncate text-sm">{tab.title}</span>
-            </div>
+            {sortedTabs.map((tab) => (
+              <SortableTab
+                key={tab.id}
+                tab={tab}
+                onRemove={(id) => removeTab.mutate(id)}
+              />
+            ))}
+          </SortableContext>
 
-            {/* Only show close button if closable is true and we have more than one tab */}
-            {orderedTabs.length > 1 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`ml-1 h-5 w-5 cursor-pointer rounded-full hover:bg-gray-200 dark:hover:bg-gray-700`}
-                onClick={(e) => handleCloseTab(e, tab.id)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Right scroll button */}
-      {showScrollButtons && (
-        <button
-          className={`flex-shrink-0 p-2 ${scrollButtonClassName}`}
-          onClick={() => scrollTabs("right")}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      )}
+          <button
+            onClick={() =>
+              createTab.mutate({
+                title: "New Tab",
+                type: "default",
+              })
+            }
+            disabled={createTab.isPending}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            +
+          </button>
+        </div>
+      </DndContext>
     </div>
   );
 }

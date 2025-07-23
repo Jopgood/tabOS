@@ -45,10 +45,11 @@ export function MainLayout() {
   return (
     <div className="[--header-height:calc(theme(spacing.14))]">
       <SidebarProvider defaultOpen={false}>
-        <AppSidebar />
+        {/* <AppSidebar /> */}
         <SidebarInset>
           <SiteHeader />
-          <TabBar renderIcon={renderTabIcon} />
+          {/* <TabBar renderIcon={renderTabIcon} /> */}
+          <TabBar />
           <TabContent className="flex-1" />
         </SidebarInset>
       </SidebarProvider>

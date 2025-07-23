@@ -1,129 +1,133 @@
-import { api } from "@/trpc/client";
+import { trpc } from "@/trpc/trpc";
 import type { Tab } from "@tabos/api/db/schema";
 
 // Helper to build tab order from after_id chain
 const buildTabOrder = (tabs: Tab[]) => {
   if (!tabs || tabs.length === 0) return [];
 
-  const ordered = [];
-  let current = tabs.find((t) => t.afterId === null); // Find first tab
+  const orderedTabs: Tab[] = [];
 
-  while (current) {
-    ordered.push(current);
-    current = tabs.find((t) => t.afterId === current!.id); // Find next tab
+  // Find the first tab (afterId is null)
+  let currentTab = tabs.find((tab) => tab.afterId === null);
+
+  while (currentTab) {
+    orderedTabs.push(currentTab);
+    // Find the next tab that comes after the current one
+    currentTab = tabs.find((tab) => tab.afterId === currentTab!.id);
   }
 
-  return ordered;
+  return orderedTabs;
 };
 
 // Get ordered tabs
 export const useOrderedTabs = () => {
-  return api.tabs.list.useQuery(undefined, {
-    select: (tabs) => buildTabOrder(tabs),
+  return trpc.tabs.getTabs.useQuery(undefined, {
+    select: buildTabOrder,
   });
 };
 
 // Create tab
 export const useCreateTab = () => {
-  const utils = api.useUtils();
+  const utils = trpc.useUtils();
 
-  return api.tabs.create.useMutation({
+  return trpc.tabs.create.useMutation({
     onSuccess: () => {
-      utils.tabs.list.invalidate();
-      utils.tabs.getActive.invalidate();
+      utils.tabs.getTabs.invalidate();
     },
   });
 };
 
 // Delete tab with optimistic update
 export const useDeleteTab = () => {
-  const utils = api.useUtils();
+  const utils = trpc.useUtils();
 
-  return api.tabs.delete.useMutation({
-    onMutate: async ({ id }) => {
-      // Cancel ongoing queries
-      await utils.tabs.list.cancel();
-      await utils.tabs.getActive.cancel();
-
-      // Get current data
-      const previousTabs = utils.tabs.list.getData();
-
-      if (previousTabs) {
-        // Optimistically remove the tab and relink the chain
-        const updatedTabs = previousTabs
-          .filter((t) => t.id !== id)
-          .map((tab) => {
-            // If this tab was after the deleted one, update its afterId
-            if (tab.afterId === id) {
-              const deletedTab = previousTabs.find((t) => t.id === id);
-              return { ...tab, afterId: deletedTab?.afterId || null };
-            }
-            return tab;
-          });
-
-        utils.tabs.list.setData(undefined, updatedTabs);
-      }
-
-      return { previousTabs };
-    },
-
-    onError: (err, variables, context) => {
-      // Rollback on error
-      if (context?.previousTabs) {
-        utils.tabs.list.setData(undefined, context.previousTabs);
-      }
-    },
-
-    onSettled: () => {
-      // Refetch to ensure consistency
-      utils.tabs.list.invalidate();
-      utils.tabs.getActive.invalidate();
-    },
-  });
-};
-
-// Set active tab
-export const useSetActiveTab = () => {
-  const utils = api.useUtils();
-
-  return api.tabs.setActive.useMutation({
-    onMutate: async ({ id }) => {
-      // Cancel ongoing queries
-      await utils.tabs.list.cancel();
-      await utils.tabs.getActive.cancel();
-
-      // Get current data
-      const previousTabs = utils.tabs.list.getData();
-
-      if (previousTabs) {
-        // Optimistically update active state
-        const updatedTabs = previousTabs.map((tab) => ({
-          ...tab,
-          isActive: tab.id === id,
-        }));
-
-        utils.tabs.list.setData(undefined, updatedTabs);
-      }
-
-      return { previousTabs };
-    },
-
-    onError: (err, variables, context) => {
-      // Rollback on error
-      if (context?.previousTabs) {
-        utils.tabs.list.setData(undefined, context.previousTabs);
-      }
-    },
-
+  return trpc.tabs.delete.useMutation({
     onSuccess: () => {
-      // Refetch to ensure consistency
-      utils.tabs.list.invalidate();
-      utils.tabs.getActive.invalidate();
+      // Just invalidate and refetch from server
+      utils.tabs.getTabs.invalidate();
+    },
+
+    onError: () => {
+      utils.tabs.getTabs.invalidate();
     },
   });
 };
 
-// Get active tab
-export const useActiveTab = () => {
-  return api.tabs.getActive.useQuery();
+// Reorder tabs with proper chain repair
+export const useReorderTabs = () => {
+  const utils = trpc.useUtils();
+  const updatePosition = trpc.tabs.updatePosition.useMutation();
+
+  return {
+    mutate: async ({
+      activeId,
+      afterId,
+    }: {
+      activeId: string;
+      afterId: string | null;
+    }) => {
+      const previousTabs = utils.tabs.getTabs.getData();
+      if (!previousTabs) return;
+
+      const activeTab = previousTabs.find((tab) => tab.id === activeId);
+      if (!activeTab) return;
+
+      // Optimistic visual update first
+      const currentOrder = buildTabOrder(previousTabs);
+      const activeIndex = currentOrder.findIndex((tab) => tab.id === activeId);
+      if (activeIndex === -1) return;
+
+      const newOrder = [...currentOrder];
+      const [movedTab] = newOrder.splice(activeIndex, 1);
+
+      let targetIndex;
+      if (!afterId) {
+        targetIndex = 0;
+      } else {
+        targetIndex = newOrder.findIndex((tab) => tab.id === afterId) + 1;
+      }
+
+      newOrder.splice(targetIndex, 0, movedTab);
+      utils.tabs.getTabs.setData(undefined, newOrder);
+
+      // Now do the proper chain repair on server
+      try {
+        // Step 1: Move the active tab to its new position
+        await updatePosition.mutateAsync({
+          id: activeId,
+          afterId: afterId,
+        });
+
+        // Step 2: Fix the tab that was after the moved tab (if any)
+        // const tabThatWasAfterMoved = previousTabs.find(
+        //   (tab) => tab.afterId === activeId
+        // );
+        // if (tabThatWasAfterMoved) {
+        //   await updatePosition.mutateAsync({
+        //     id: tabThatWasAfterMoved.id,
+        //     afterId: activeTab.afterId,
+        //   });
+        // }
+
+        // Step 3: Fix the tab that was after the target (if any)
+        if (afterId) {
+          const tabThatWasAfterTarget = previousTabs.find(
+            (tab) => tab.afterId === afterId
+          );
+          if (tabThatWasAfterTarget && tabThatWasAfterTarget.id !== activeId) {
+            await updatePosition.mutateAsync({
+              id: tabThatWasAfterTarget.id,
+              afterId: activeId,
+            });
+          }
+        }
+
+        // Refresh to get the authoritative state
+        utils.tabs.getTabs.invalidate();
+      } catch (error) {
+        console.error("Reorder failed:", error);
+        utils.tabs.getTabs.invalidate();
+      }
+    },
+  };
 };

@@ -1,6 +1,10 @@
 import { MainLayout } from "@/components/layouts/MainLayout";
-import { Main } from "@/components/main";
+import ClientProvider from "./ClientProvider";
 
 export default async function HomePage() {
-  return <MainLayout />;
+  return (
+    <ClientProvider>
+      <MainLayout />
+    </ClientProvider>
+  );
 }
